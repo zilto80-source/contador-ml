@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico ML</title>
+  <style>
+    body { font-family: Arial; margin:0; padding:20px; background:#f8f9fa; }
+    table { width:100%; border-collapse: collapse; background:white; }
+    th, td { padding: 14px; border: 1px solid #ddd; text-align: left; }
+    th { background: #00a650; color: white; }
+    input, button { padding: 12px; margin: 8px 4px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>📋 Histórico de Etiquetas</h1>
+  
+  <input type="text" id="filtroCodigo" placeholder="Filtrar Pack ID ou Código">
+  <input type="date" id="filtroData">
+  <button onclick="carregarHistorico()">🔎 Filtrar</button>
+  <button onclick="exportarCSV()">📤 Exportar CSV (Excel)</button>
+  <button onclick="window.location.href='index.html'">← Início</button>
+
+  <table id="tabela">
+    <thead>
+      <tr>
+        <th>Data/Hora</th>
+        <th>Código / Pack ID</th>
+        <th>NF</th>
+        <th>Modo</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let db;
+    function initDB() {
+      const request = indexedDB.open('EtiquetasML', 2);
+      request.onsuccess = e => { db = e.target.result; carregarHistorico(); };
+    }
+
+    async function carregarHistorico() {
+      const tbody = document.querySelector('#tabela tbody');
+      tbody.innerHTML = '';
+
+      const filtroCodigo = document.getElementById('filtroCodigo').value.trim().toUpperCase();
+      const filtroData   = document.getElementById('filtroData').value;
+
+      const tx = db.transaction('etiquetas', 'readonly');
+      const store = tx.objectStore('etiquetas');
+      const cursor = store.openCursor();
+
+      cursor.onsuccess = function(e) {
+        const result = e.target.result;
+        if (result) {
+          const reg = result.value;
+          const dataStr = new Date(reg.data).toLocaleString('pt-BR');
+
+          // Filtros
+          if (filtroCodigo && !reg.codigo.includes(filtroCodigo)) { result.continue(); return; }
+          if (filtroData && !reg.data.startsWith(filtroData)) { result.continue(); return; }
+
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${dataStr}</td>
+            <td>${reg.codigo}</td>
+            <td>${reg.nf || '—'}</td>
+            <td>${reg.modo}</td>
+          `;
+          tbody.appendChild(row);
+          result.continue();
+        }
+      };
+    }
+
+    function exportarCSV() {
+      let csv = 'Data;Código / Pack ID;NF;Modo\n';
+      const tx = db.transaction('etiquetas', 'readonly');
+      const store = tx.objectStore('etiquetas');
+      
+      store.openCursor().onsuccess = function(e) {
+        const cursor = e.target.result;
+        if (cursor) {
+          const d = new Date(cursor.value.data).toLocaleString('pt-BR');
+          csv += `"${d}";"${cursor.value.codigo}";"${cursor.value.nf || ''}";"${cursor.value.modo}"\n`;
+          cursor.continue();
+        } else {
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `etiquetas_ml_${new Date().toISOString().slice(0,10)}.csv`;
+          link.click();
+        }
+      };
+    }
+
+    window.onload = initDB;
+  </script>
+</body>
+</html>

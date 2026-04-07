@@ -1,0 +1,16 @@
+{
+  "name": "Contador ML Etiquetas",
+  "short_name": "Contador ML",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#00a650",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968890.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

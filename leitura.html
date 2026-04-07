@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leitura de Etiquetas ML</title>
+  <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@v5/dist/tesseract.min.js"></script>
+  <style>
+    body { font-family: Arial; margin:0; background:#f8f9fa; }
+    .container { max-width: 600px; margin: 0 auto; padding: 15px; }
+    #contador { font-size: 52px; font-weight: bold; color: #00a650; text-align:center; margin:20px 0; }
+    video, canvas { width: 100%; border-radius: 12px; }
+    button { width: 100%; padding: 20px; margin: 10px 0; font-size: 22px; border: none; border-radius: 12px; font-weight: bold; }
+    .btn-beep { background: #00a650; color: white; }
+    .btn-foto { background: #007bff; color: white; }
+    #resultado { margin: 20px 0; padding: 20px; background: white; border-radius: 12px; font-size: 18px; min-height: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 id="tituloModo" style="text-align:center; color:#333;">Modo de Leitura</h2>
+    <div id="contador">0</div>
+    <p style="text-align:center; font-size:18px;">etiquetas contadas</p>
+
+    <!-- === MODO BEEP === -->
+    <div id="areaBeep">
+      <video id="video" autoplay playsinline></video>
+      <button class="btn-beep" onclick="iniciarScanner()">🎤 INICIAR SCANNER BEEP</button>
+      <input type="text" id="codigoManual" placeholder="Ou digite o código manualmente" style="width:100%; padding:18px; margin:10px 0; font-size:18px;">
+      <button onclick="adicionarManual()" style="background:#555; color:white;">Adicionar Manual</button>
+    </div>
+
+    <!-- === MODO FOTO === -->
+    <div id="areaFoto" style="display:none;">
+      <button class="btn-foto" onclick="document.getElementById('fotoInput').click()">📸 TIRAR FOTO DA ETIQUETA</button>
+      <input type="file" id="fotoInput" accept="image/*" capture="camera" style="display:none;">
+    </div>
+
+    <div id="resultado"></div>
+    <button onclick="window.location.href='index.html'" style="background:#6c757d; color:white;">← Voltar ao Início</button>
+  </div>
+
+  <script>
+    let db;
+    let contador = 0;
+    let modo = localStorage.getItem('modoAtual') || 'beep';
+
+    // ====================== BANCO DE DADOS ======================
+    function initDB() {
+      const request = indexedDB.open('EtiquetasML', 2); // versão 2 para incluir NF
+      request.onupgradeneeded = function(e) {
+        db = e.target.result;
+        if (!db.objectStoreNames.contains('etiquetas')) {
+          const store = db.createObjectStore('etiquetas', { keyPath: 'codigo' });
+          store.createIndex('data', 'data');
+        }
+      };
+      request.onsuccess = function(e) {
+        db = e.target.result;
+        carregarContador();
+      };
+    }
+
+    async function carregarContador() {
+      const tx = db.transaction('etiquetas', 'readonly');
+      const store = tx.objectStore('etiquetas');
+      const count = await new Promise(r => { const req = store.count(); req.onsuccess = () => r(req.result); });
+      contador = count;
+      document.getElementById('contador').textContent = contador;
+    }
+
+    // ====================== SALVAR (com filtro de duplicidade) ======================
+    async function salvarEtiqueta(codigo, nf = '') {
+      if (!codigo || codigo.trim() === '') return false;
+
+      const tx = db.transaction('etiquetas', 'readwrite');
+      const store = tx.objectStore('etiquetas');
+
+      const existe = await new Promise(resolve => {
+        const req = store.get(codigo.trim());
+        req.onsuccess = () => resolve(!!req.result);
+      });
+
+      if (existe) {
+        document.getElementById('resultado').innerHTML = `<span style="color:red; font-size:20px;">⚠️ ETIQUETA JÁ CONTABILIZADA<br>${codigo}</span>`;
+        return false;
+      }
+
+      const registro = {
+        codigo: codigo.trim(),
+        nf: nf.trim(),
+        data: new Date().toISOString(),
+        modo: modo
+      };
+
+      await new Promise(resolve => {
+        store.add(registro);
+        resolve();
+      });
+
+      contador++;
+      document.getElementById('contador').textContent = contador;
+      return true;
+    }
+
+    // ====================== MODO BEEP ======================
+    function iniciarScanner() {
+      Quagga.init({
+        inputStream: { type: "LiveStream", target: document.querySelector('#video'), constraints: { facingMode: "environment" } },
+        decoder: { readers: ["code_128_reader", "ean_reader", "qr_reader", "upc_reader"] }
+      }, function(err) {
+        if (err) { alert("Erro ao abrir câmera"); return; }
+        Quagga.start();
+      });
+
+      Quagga.onDetected(async function(result) {
+        const codigo = result.codeResult.code;
+        Quagga.stop();
+        await salvarEtiqueta(codigo);
+        document.getElementById('resultado').innerHTML = `<span style="color:green; font-size:20px;">✅ BEEP OK<br>Código: ${codigo}</span>`;
+      });
+    }
+
+    async function adicionarManual() {
+      const codigo = document.getElementById('codigoManual').value.trim();
+      if (codigo) {
+        await salvarEtiqueta(codigo);
+        document.getElementById('codigoManual').value = '';
+      }
+    }
+
+    // ====================== MODO FOTO + OCR (extrai só Pack ID e NF) ======================
+    document.getElementById('fotoInput').addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const resultadoDiv = document.getElementById('resultado');
+      resultadoDiv.innerHTML = `<span style="color:#007bff;">⏳ Processando OCR da etiqueta...</span>`;
+
+      const worker = await Tesseract.createWorker('por+eng', 1);
+      const { data: { text } } = await worker.recognize(file);
+      await worker.terminate();
+
+      // === EXTRAÇÃO EXATA conforme sua etiqueta ===
+      const packRegex = /Pack\s*ID[:\s]*(\d+)/i;
+      const nfRegex   = /NF[:\s]*(\d+)/i;
+
+      const packMatch = text.match(packRegex);
+      const nfMatch   = text.match(nfRegex);
+
+      const packId = packMatch ? packMatch[1] : null;
+      const nf     = nfMatch   ? nfMatch[1]   : '';
+
+      if (packId) {
+        const salvo = await salvarEtiqueta(packId, nf);
+        if (salvo) {
+          resultadoDiv.innerHTML = `
+            <span style="color:green; font-size:20px;">
+              ✅ ETIQUETA CONTABILIZADA<br>
+              Pack ID: <b>${packId}</b><br>
+              NF: <b>${nf || '—'}</b>
+            </span>`;
+        }
+      } else {
+        resultadoDiv.innerHTML = `
+          <span style="color:orange; font-size:18px;">
+            ❌ Não encontrei Pack ID na foto.<br>
+            Tente uma foto mais nítida da etiqueta.
+          </span><br>
+          <small>Texto detectado: ${text.substring(0, 120)}...</small>`;
+      }
+    });
+
+    // ====================== INICIALIZAÇÃO ======================
+    window.onload = function() {
+      initDB();
+      document.getElementById('tituloModo').textContent = modo === 'beep' 
+        ? '🎤 MODO BEEP' 
+        : '📸 MODO FOTO + OCR';
+      
+      if (modo === 'foto') {
+        document.getElementById('areaBeep').style.display = 'none';
+        document.getElementById('areaFoto').style.display = 'block';
+      }
+    };
+  </script>
+</body>
+</html>

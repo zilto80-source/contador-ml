@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#00a650">
+  <title>Contador ML</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f8f9fa; }
+    .container { max-width: 600px; margin: 40px auto; padding: 20px; text-align: center; }
+    h1 { color: #00a650; font-size: 28px; }
+    .modo-btn {
+      display: block; width: 100%; padding: 35px; margin: 20px 0;
+      font-size: 28px; font-weight: bold; border: none; border-radius: 15px;
+      color: white; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .modo-beep { background: #00a650; }
+    .modo-foto { background: #007bff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📦 Contador de Etiquetas<br>Mercado Livre</h1>
+    <p style="font-size:22px; margin:30px 0;">Escolha o modo:</p>
+    
+    <button class="modo-btn modo-beep" onclick="iniciarLeitura('beep')">🎤 BEEP<br><span style="font-size:18px;">Código de Barras / QR</span></button>
+    <button class="modo-btn modo-foto" onclick="iniciarLeitura('foto')">📸 FOTO<br><span style="font-size:18px;">OCR da Etiqueta</span></button>
+    
+    <br><br>
+    <button onclick="verHistorico()" style="width:100%; padding:18px; font-size:20px; background:#6c757d; color:white; border:none; border-radius:12px;">📋 Ver Histórico</button>
+  </div>
+
+  <script>
+    function iniciarLeitura(modo) { localStorage.setItem('modoAtual', modo); window.location.href = 'leitura.html'; }
+    function verHistorico() { window.location.href = 'historico.html'; }
+  </script>
+</body>
+</html>
