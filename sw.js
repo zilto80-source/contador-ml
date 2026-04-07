@@ -1,5 +1,6 @@
-const CACHE_NAME = 'contador-ml-v1';
+const CACHE_NAME = 'contador-ml-v2';
 const urlsToCache = [
+  './',
   'index.html',
   'leitura.html',
   'historico.html',
