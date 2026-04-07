@@ -1,13 +1,17 @@
 {
   "name": "Contador de Etiquetas Mercado Livre",
   "short_name": "Contador ML",
-  "description": "Contador de etiquetas de envio do Mercado Livre - Modo Beep e Foto com OCR",
+  "description": "Contador de etiquetas de envio do Mercado Livre com Modo Beep (código de barras) e Modo Foto + OCR. Evita duplicidade automaticamente.",
   "start_url": "./",
   "scope": "./",
+  "id": "./",
   "display": "standalone",
   "background_color": "#f8f9fa",
   "theme_color": "#00a650",
   "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/5968/5968890.png",
@@ -20,7 +24,5 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ],
-  "screenshots": [],
-  "shortcuts": []
+  ]
 }
